@@ -70,10 +70,19 @@
                             <version>1.17.0</version>
                             <style>AOSP</style>
                         </googleJavaFormat>
-                        <removeUnusedImports/>
-                        <trimTrailingWhitespace/>
+                        <removeUnusedImports />
+                        <trimTrailingWhitespace />
                     </java>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
