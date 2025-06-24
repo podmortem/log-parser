@@ -1,8 +1,9 @@
-package com.redhat.podmortem.rest;
+package com.redhat.podmortem.parser.rest;
 
 import com.redhat.podmortem.common.model.analysis.AnalysisResult;
 import com.redhat.podmortem.common.model.kube.podmortem.PodFailureData;
-import com.redhat.podmortem.service.AnalysisService;
+import com.redhat.podmortem.parser.service.AnalysisService;
+
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;

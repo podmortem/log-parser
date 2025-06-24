@@ -1,4 +1,4 @@
-package com.redhat.podmortem.service;
+package com.redhat.podmortem.parser.service;
 
 import com.redhat.podmortem.common.model.analysis.MatchedEvent;
 import com.redhat.podmortem.common.model.pattern.Pattern;
