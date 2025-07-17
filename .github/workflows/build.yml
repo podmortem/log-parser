@@ -12,7 +12,7 @@ jobs:
   test-build:
     name: Test Build on Pull Request
     if: github.event_name == 'pull_request'
-    runs-on: cassidy
+    runs-on: self-hosted
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
   build-and-push:
     name: Build and Push on Main
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: cassidy
+    runs-on: self-hosted
     permissions:
       contents: read
       packages: write
