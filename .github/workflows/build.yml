@@ -22,16 +22,16 @@ jobs:
         with:
           image: podmortem-log-parser-test
           tags: latest
-          dockerfiles: |
+          containerfiles: |
             ./src/main/docker/Dockerfile.native
           build-args: |
             GITHUB_USER=${{ github.actor }}
             GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
-  build-and-push-amd64:
-    name: Build and Push AMD64 on Main
+  build-and-push:
+    name: Build and Push on Main
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, linux, amd64]
+    runs-on: self-hosted
     permissions:
       contents: read
       packages: write
@@ -39,71 +39,62 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Build AMD64 image
-        id: build-image
+        id: build-amd64
         uses: redhat-actions/buildah-build@v2
         with:
           image: ghcr.io/${{ github.repository_owner }}/podmortem-log-parser
           tags: latest-amd64 ${{ github.sha }}-amd64
-          dockerfiles: |
+          containerfiles: |
             ./src/main/docker/Dockerfile.native
           build-args: |
             GITHUB_USER=${{ github.actor }}
             GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push to GitHub Container Registry
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ steps.build-image.outputs.tags }}
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GH_PAT }}
-
-  build-and-push-arm64:
-    name: Build and Push ARM64 on Main
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: [self-hosted, linux, arm64]
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+            TARGETARCH=amd64
+            TARGETOS=linux
 
       - name: Build ARM64 image
-        id: build-image
+        id: build-arm64
         uses: redhat-actions/buildah-build@v2
         with:
           image: ghcr.io/${{ github.repository_owner }}/podmortem-log-parser
           tags: latest-arm64 ${{ github.sha }}-arm64
-          dockerfiles: |
+          containerfiles: |
             ./src/main/docker/Dockerfile.native
           build-args: |
             GITHUB_USER=${{ github.actor }}
             GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            TARGETARCH=arm64
+            TARGETOS=linux
 
-      - name: Push to GitHub Container Registry
+      - name: Push AMD64 image
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: ${{ steps.build-image.outputs.image }}
-          tags: ${{ steps.build-image.outputs.tags }}
+          image: ${{ steps.build-amd64.outputs.image }}
+          tags: ${{ steps.build-amd64.outputs.tags }}
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GH_PAT }}
 
-  create-manifest:
-    name: Create and Push Multi-arch Manifest
-    needs: [build-and-push-amd64, build-and-push-arm64]
-    runs-on: self-hosted
-    steps:
-      - name: Create and Push Manifest
+      - name: Push ARM64 image
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-arm64.outputs.image }}
+          tags: ${{ steps.build-arm64.outputs.tags }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_PAT }}
+
+      - name: Create and push manifest list
         run: |
           buildah manifest create ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:latest
           buildah manifest add ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:latest ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:latest-amd64
           buildah manifest add ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:latest ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:latest-arm64
           buildah manifest push --all ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:latest docker://ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:latest
-          
+
           buildah manifest create ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:${{ github.sha }}
           buildah manifest add ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:${{ github.sha }}-amd64
           buildah manifest add ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:${{ github.sha }} ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:${{ github.sha }}-arm64

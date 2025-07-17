@@ -1,4 +1,7 @@
-FROM registry.access.redhat.com/quarkus/mandrel-for-jdk-21-rhel8:23.1 AS build
+ARG TARGETARCH
+ARG TARGETOS
+
+FROM registry.access.redhat.com/quarkus/mandrel-for-jdk-21-rhel8:23.1-${TARGETOS}.${TARGETARCH} AS build
 WORKDIR /home/quarkus
 
 COPY --chown=quarkus:quarkus mvnw .
@@ -15,7 +18,7 @@ ENV GITHUB_TOKEN=$GITHUB_TOKEN
 
 RUN ./mvnw --no-transfer-progress -s src/main/resources/settings.xml -U package -Dnative
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest.${TARGETOS}.${TARGETARCH}
 
 WORKDIR /work/
 COPY --from=build /home/quarkus/target/*-runner /work/application
