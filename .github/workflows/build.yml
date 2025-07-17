@@ -40,10 +40,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Build image
         id: build-image
         uses: redhat-actions/buildah-build@v2
         with:
+          platforms: linux/amd64,linux/arm64
           image: ghcr.io/${{ github.repository_owner }}/podmortem-log-parser
           tags: latest ${{ github.sha }}
           dockerfiles: |
