@@ -10,8 +10,7 @@ ARG GITHUB_USER
 ENV GITHUB_USER=$GITHUB_USER
 
 RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
-    chown -R quarkus:quarkus /home/quarkus && \
-    runuser -u quarkus -- ./mvnw --no-transfer-progress -s src/main/resources/settings.xml dependency:go-offline -DskipTests
+    ./mvnw --no-transfer-progress -s src/main/resources/settings.xml dependency:go-offline -DskipTests
 
 USER quarkus
 
@@ -19,8 +18,7 @@ FROM dependencies AS build
 COPY --chown=quarkus:quarkus src src
 
 RUN --mount=type=secret,id=GITHUB_TOKEN,env=GITHUB_TOKEN \
-    chown -R quarkus:quarkus /home/quarkus && \
-    runuser -u quarkus -- ./mvnw --no-transfer-progress -s src/main/resources/settings.xml -U package -Dnative -DskipTests
+    ./mvnw --no-transfer-progress -s src/main/resources/settings.xml -U package -Dnative -DskipTests
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
