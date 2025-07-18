@@ -41,9 +41,9 @@ jobs:
           cache-from: |
             type=gha,scope=deps
             type=registry,ref=ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:deps-cache
-          cache-to: |
-            type=gha,mode=max,scope=deps
-            ${{ github.event_name == 'push' && 'type=registry,ref=ghcr.io/${{ github.repository_owner }}/podmortem-log-parser:deps-cache,mode=max' || '' }}
+                     cache-to: |
+             type=gha,mode=max,scope=deps
+             ${{ github.event_name == 'push' && format('type=registry,ref=ghcr.io/{0}/podmortem-log-parser:deps-cache,mode=max', github.repository_owner) || '' }}
           tags: |
             ${{ github.event_name == 'push' && format('ghcr.io/{0}/podmortem-log-parser:deps-cache', github.repository_owner) || '' }}
           build-args: |
