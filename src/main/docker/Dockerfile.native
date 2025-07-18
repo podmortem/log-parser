@@ -11,14 +11,14 @@ USER quarkus
 ARG GITHUB_USER
 ENV GITHUB_USER=$GITHUB_USER
 
-RUN --mount=type=secret,id=GITHUB_TOKEN \
+RUN --mount=type=secret,id=GITHUB_TOKEN,uid=1000,gid=1000 \
     GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) \
     ./mvnw --no-transfer-progress -s src/main/resources/settings.xml dependency:go-offline -DskipTests
 
 FROM dependencies AS build
 COPY --chown=quarkus:quarkus src src
 
-RUN --mount=type=secret,id=GITHUB_TOKEN \
+RUN --mount=type=secret,id=GITHUB_TOKEN,uid=1000,gid=1000 \
     GITHUB_TOKEN=$(cat /run/secrets/GITHUB_TOKEN) \
     ./mvnw --no-transfer-progress -s src/main/resources/settings.xml -U package -Dnative -DskipTests
 
