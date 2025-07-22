@@ -6,6 +6,7 @@ import com.redhat.podmortem.common.model.pattern.SecondaryPattern;
 import com.redhat.podmortem.common.model.pattern.SequenceEvent;
 import com.redhat.podmortem.common.model.pattern.SequencePattern;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import java.util.List;
 import java.util.Map;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -32,6 +33,9 @@ public class ScoringService {
     @ConfigProperty(name = "scoring.proximity.max-window", defaultValue = "100")
     int maxWindow;
 
+    @Inject ContextAnalysisService contextAnalysisService;
+    @Inject FrequencyTrackingService frequencyTrackingService;
+
     /**
      * Calculates the final score for a matched event.
      *
@@ -53,16 +57,34 @@ public class ScoringService {
         // calculate temporal factor using sequence pattern analysis
         double temporalFactor = calculateTemporalFactor(event, allLines);
 
+        // calculate context factor using keyword weighting
+        double contextFactor = contextAnalysisService.calculateContextFactor(event.getContext());
+
+        // calculate frequency penalty
+        double frequencyPenalty =
+                frequencyTrackingService.calculateFrequencyPenalty(pattern.getId());
+
+        // record this match for future frequency tracking
+        frequencyTrackingService.recordPatternMatch(pattern.getId());
+
         log.debug(
-                "Pattern '{}': Base Confidence={}, Severity Multiplier={}, Proximity Factor={}, Temporal Factor={}",
+                "Pattern '{}': Base Confidence={}, Severity Multiplier={}, Proximity Factor={}, Temporal Factor={}, Context Factor={}, Frequency Penalty={}",
                 pattern.getName(),
                 baseConfidence,
                 severityMultiplier,
                 proximityFactor,
-                temporalFactor);
+                temporalFactor,
+                contextFactor,
+                frequencyPenalty);
 
-        // final score calculation using multiplicative formula
-        double finalScore = baseConfidence * severityMultiplier * proximityFactor * temporalFactor;
+        // final score calculation
+        double finalScore =
+                baseConfidence
+                        * severityMultiplier
+                        * proximityFactor
+                        * temporalFactor
+                        * contextFactor
+                        * (1.0 - frequencyPenalty);
 
         return finalScore;
     }
