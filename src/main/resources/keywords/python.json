@@ -1,0 +1,39 @@
+{
+  "python_errors": {
+    "Traceback": 0.4,
+    "AttributeError": 0.3,
+    "KeyError": 0.3,
+    "IndexError": 0.3,
+    "ValueError": 0.3,
+    "TypeError": 0.3,
+    "ImportError": 0.3,
+    "ModuleNotFoundError": 0.3,
+    "FileNotFoundError": 0.2,
+    "PermissionError": 0.2,
+    "MemoryError": 0.5,
+    "RecursionError": 0.4
+  },
+  "python_frameworks": {
+    "Django": 0.1,
+    "Flask": 0.1,
+    "FastAPI": 0.1,
+    "SQLAlchemy": 0.1,
+    "Celery": 0.1,
+    "pytest": 0.1,
+    "numpy": 0.1,
+    "pandas": 0.1
+  },
+  "python_warnings": {
+    "DeprecationWarning": 0.1,
+    "UserWarning": 0.1,
+    "FutureWarning": 0.1,
+    "RuntimeWarning": 0.2
+  },
+  "python_performance": {
+    "memory usage": 0.2,
+    "cpu usage": 0.2,
+    "slow query": 0.3,
+    "timeout": 0.3,
+    "blocked": 0.2
+  }
+} 

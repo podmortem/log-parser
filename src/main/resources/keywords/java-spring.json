@@ -1,0 +1,65 @@
+{
+  "error_indicators": {
+    "ERROR": 0.4,
+    "FATAL": 0.5,
+    "CRITICAL": 0.4,
+    "Exception": 0.3,
+    "RuntimeException": 0.4,
+    "NullPointerException": 0.3,
+    "OutOfMemoryError": 0.5,
+    "StackOverflowError": 0.4,
+    "ClassNotFoundException": 0.3,
+    "ConnectionException": 0.3,
+    "TimeoutException": 0.3,
+    "SQLException": 0.3,
+    "IOException": 0.2,
+    "failed": 0.2,
+    "failure": 0.2,
+    "crash": 0.4,
+    "abort": 0.3
+  },
+  "framework_indicators": {
+    "SpringApplication": 0.1,
+    "BeanFactory": 0.2,
+    "ApplicationContext": 0.1,
+    "Hibernate": 0.1,
+    "Tomcat": 0.1,
+    "Jetty": 0.1,
+    "Kafka": 0.1,
+    "Redis": 0.1,
+    "MongoDB": 0.1,
+    "PostgreSQL": 0.1,
+    "MySQL": 0.1
+  },
+  "debug_indicators": {
+    "DEBUG": -0.1,
+    "TRACE": -0.1,
+    "FINEST": -0.1,
+    "debug": -0.05,
+    "trace": -0.05
+  },
+  "warning_indicators": {
+    "WARN": 0.2,
+    "WARNING": 0.2,
+    "deprecated": 0.1,
+    "retry": 0.1,
+    "retrying": 0.1
+  },
+  "performance_indicators": {
+    "slow": 0.2,
+    "timeout": 0.3,
+    "performance": 0.1,
+    "latency": 0.1,
+    "memory": 0.1,
+    "cpu": 0.1,
+    "disk": 0.1
+  },
+  "security_indicators": {
+    "unauthorized": 0.3,
+    "forbidden": 0.3,
+    "authentication": 0.2,
+    "permission": 0.2,
+    "security": 0.2,
+    "denied": 0.2
+  }
+} 
