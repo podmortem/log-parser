@@ -3,6 +3,8 @@ package com.redhat.podmortem.parser.service;
 import com.redhat.podmortem.common.model.analysis.MatchedEvent;
 import com.redhat.podmortem.common.model.pattern.Pattern;
 import com.redhat.podmortem.common.model.pattern.SecondaryPattern;
+import com.redhat.podmortem.common.model.pattern.SequenceEvent;
+import com.redhat.podmortem.common.model.pattern.SequencePattern;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import java.util.Map;
@@ -48,15 +50,19 @@ public class ScoringService {
         // calculate proximity factor using exponential decay
         double proximityFactor = calculateProximityFactor(event, allLines);
 
+        // calculate temporal factor using sequence pattern analysis
+        double temporalFactor = calculateTemporalFactor(event, allLines);
+
         log.debug(
-                "Pattern '{}': Base Confidence={}, Severity Multiplier={}, Proximity Factor={}",
+                "Pattern '{}': Base Confidence={}, Severity Multiplier={}, Proximity Factor={}, Temporal Factor={}",
                 pattern.getName(),
                 baseConfidence,
                 severityMultiplier,
-                proximityFactor);
+                proximityFactor,
+                temporalFactor);
 
         // final score calculation using multiplicative formula
-        double finalScore = baseConfidence * severityMultiplier * proximityFactor;
+        double finalScore = baseConfidence * severityMultiplier * proximityFactor * temporalFactor;
 
         return finalScore;
     }
@@ -98,6 +104,107 @@ public class ScoringService {
         }
 
         return 1.0 + totalProximityFactor; // base 1.0 + bonus
+    }
+
+    /**
+     * Calculates the temporal factor using sequence pattern analysis.
+     *
+     * @param event The primary matched event.
+     * @param allLines The complete array of log lines for context.
+     * @return The temporal factor (1.0 + cumulative sequence bonuses).
+     */
+    private double calculateTemporalFactor(MatchedEvent event, String[] allLines) {
+        Pattern pattern = event.getMatchedPattern();
+        List<SequencePattern> sequences = pattern.getSequencePatterns();
+
+        if (sequences == null || sequences.isEmpty()) {
+            return 1.0;
+        }
+
+        double totalSequenceBonus = 0.0;
+        for (SequencePattern sequence : sequences) {
+            if (isSequenceMatched(sequence, event, allLines)) {
+                totalSequenceBonus += sequence.getBonusMultiplier();
+
+                log.debug(
+                        "Sequence pattern '{}' matched, adding bonus: {}",
+                        sequence.getDescription(),
+                        sequence.getBonusMultiplier());
+            }
+        }
+
+        return 1.0 + totalSequenceBonus;
+    }
+
+    /**
+     * Checks if a sequence pattern is matched by finding all required events in order.
+     *
+     * @param sequence The sequence pattern to check.
+     * @param event The primary matched event.
+     * @param allLines The complete array of log lines for context.
+     * @return True if the sequence is matched, false otherwise.
+     */
+    private boolean isSequenceMatched(
+            SequencePattern sequence, MatchedEvent event, String[] allLines) {
+        List<SequenceEvent> events = sequence.getEvents();
+        if (events == null || events.isEmpty()) {
+            return false;
+        }
+
+        int primaryLineIndex = event.getLineNumber() - 1;
+        int currentSearchIndex = 0;
+
+        // look for events in sequence order, working backwards from primary match
+        for (int i = events.size() - 1; i >= 0; i--) {
+            SequenceEvent sequenceEvent = events.get(i);
+
+            // for the most recent event, it should be near or at the primary match
+            if (i == events.size() - 1) {
+                // check if this event matches the primary or is very close to it
+                if (!isEventFoundNearPrimary(sequenceEvent, primaryLineIndex, allLines)) {
+                    return false;
+                }
+                currentSearchIndex = primaryLineIndex;
+            } else {
+                // look for this event before the current position
+                int foundIndex = findEventBefore(sequenceEvent, currentSearchIndex, allLines);
+                if (foundIndex < 0) {
+                    return false;
+                }
+                currentSearchIndex = foundIndex;
+            }
+        }
+
+        return true;
+    }
+
+    /** Checks if a sequence event is found near the primary match. */
+    private boolean isEventFoundNearPrimary(
+            SequenceEvent sequenceEvent, int primaryIndex, String[] allLines) {
+        // check a small window around the primary match (+/- 5 lines)
+        int windowSize = 5;
+        int start = Math.max(0, primaryIndex - windowSize);
+        int end = Math.min(allLines.length, primaryIndex + windowSize + 1);
+
+        for (int i = start; i < end; i++) {
+            if (sequenceEvent.getCompiledRegex() != null
+                    && sequenceEvent.getCompiledRegex().matcher(allLines[i]).find()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Finds a sequence event before the given index. */
+    private int findEventBefore(SequenceEvent sequenceEvent, int beforeIndex, String[] allLines) {
+        // search backwards from the given index
+        for (int i = beforeIndex - 1; i >= 0; i--) {
+            if (sequenceEvent.getCompiledRegex() != null
+                    && sequenceEvent.getCompiledRegex().matcher(allLines[i]).find()) {
+                return i;
+            }
+        }
+        return -1; // not found
     }
 
     /**
