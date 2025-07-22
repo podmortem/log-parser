@@ -17,11 +17,11 @@ public class ScoringService {
     // multipliers for different severity levels.
     private static final Map<String, Double> SEVERITY_MULTIPLIERS =
             Map.of(
-                    "CRITICAL", 1.5,
-                    "HIGH", 1.2,
-                    "MEDIUM", 1.0,
-                    "LOW", 0.8,
-                    "INFO", 0.5);
+                    "CRITICAL", 5.0,
+                    "HIGH", 3.0,
+                    "MEDIUM", 2.0,
+                    "LOW", 1.5,
+                    "INFO", 1.0);
 
     /**
      * Calculates the final score for a matched event.
@@ -60,8 +60,7 @@ public class ScoringService {
         // final score calculation
         double finalScore = score + proximityBonus;
 
-        // ensure score is capped at 1.0
-        return Math.min(1.0, finalScore);
+        return finalScore;
     }
 
     /**
