@@ -6,6 +6,7 @@ import com.redhat.podmortem.common.model.pattern.SecondaryPattern;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.List;
 import java.util.Map;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,12 @@ public class ScoringService {
                     "LOW", 1.5,
                     "INFO", 1.0);
 
+    @ConfigProperty(name = "scoring.proximity.decay-constant", defaultValue = "10.0")
+    double decayConstant;
+
+    @ConfigProperty(name = "scoring.proximity.max-window", defaultValue = "100")
+    int maxWindow;
+
     /**
      * Calculates the final score for a matched event.
      *
@@ -32,63 +39,106 @@ public class ScoringService {
      */
     public double calculateScore(MatchedEvent event, String[] allLines) {
         Pattern pattern = event.getMatchedPattern();
-        double baseScore = pattern.getPrimaryPattern().getConfidence();
+        double baseConfidence = pattern.getPrimaryPattern().getConfidence();
 
         // apply Severity Multiplier
         double severityMultiplier =
                 SEVERITY_MULTIPLIERS.getOrDefault(pattern.getSeverity().toUpperCase(), 1.0);
-        double score = baseScore * severityMultiplier;
 
-        // apply proximity bonus from secondary patterns
-        double proximityBonus = 0.0;
-        List<SecondaryPattern> secondaryPatterns = pattern.getSecondaryPatterns();
-        if (secondaryPatterns != null && !secondaryPatterns.isEmpty()) {
-            for (SecondaryPattern secondary : secondaryPatterns) {
-                if (isSecondaryPatternPresent(secondary, event.getLineNumber() - 1, allLines)) {
-                    proximityBonus += secondary.getWeight();
-                }
-            }
-        }
+        // calculate proximity factor using exponential decay
+        double proximityFactor = calculateProximityFactor(event, allLines);
 
         log.debug(
-                "Pattern '{}': Base Score={}, Severity Multiplier={}, Proximity Bonus={}",
+                "Pattern '{}': Base Confidence={}, Severity Multiplier={}, Proximity Factor={}",
                 pattern.getName(),
-                baseScore,
+                baseConfidence,
                 severityMultiplier,
-                proximityBonus);
+                proximityFactor);
 
-        // final score calculation
-        double finalScore = score + proximityBonus;
+        // final score calculation using multiplicative formula
+        double finalScore = baseConfidence * severityMultiplier * proximityFactor;
 
         return finalScore;
     }
 
     /**
-     * check if a secondary pattern is present within the proximity window of a primary match
+     * Calculates the proximity factor using exponential decay based on distance to secondary
+     * patterns.
+     *
+     * @param event The primary matched event.
+     * @param allLines The complete array of log lines for context.
+     * @return The proximity factor (1.0 + cumulative weighted decay factors).
+     */
+    private double calculateProximityFactor(MatchedEvent event, String[] allLines) {
+        Pattern pattern = event.getMatchedPattern();
+        List<SecondaryPattern> secondaryPatterns = pattern.getSecondaryPatterns();
+
+        if (secondaryPatterns == null || secondaryPatterns.isEmpty()) {
+            return 1.0; // no secondary patterns
+        }
+
+        double totalProximityFactor = 0.0;
+        int primaryLineIndex = event.getLineNumber() - 1;
+
+        for (SecondaryPattern secondary : secondaryPatterns) {
+            double closestDistance =
+                    findClosestSecondaryPatternDistance(secondary, primaryLineIndex, allLines);
+
+            if (closestDistance >= 0) { // pattern found
+                double decayFactor = Math.exp(-closestDistance / decayConstant);
+                totalProximityFactor += secondary.getWeight() * decayFactor;
+
+                log.debug(
+                        "Secondary pattern '{}' found at distance {}, decay factor: {}, weighted contribution: {}",
+                        secondary.getRegex(),
+                        closestDistance,
+                        decayFactor,
+                        secondary.getWeight() * decayFactor);
+            }
+        }
+
+        return 1.0 + totalProximityFactor; // base 1.0 + bonus
+    }
+
+    /**
+     * Finds the closest distance to a secondary pattern within the proximity window.
      *
      * @param secondary The secondary pattern to search for.
-     * @param primaryMatchIndex The line number index of the primary match.
+     * @param primaryIndex The line number index of the primary match.
      * @param allLines The complete array of log lines.
-     * @return True if the secondary pattern is found within the window, otherwise false.
+     * @return The distance to the closest match, or -1 if not found within window.
      */
-    private boolean isSecondaryPatternPresent(
-            SecondaryPattern secondary, int primaryMatchIndex, String[] allLines) {
-        int start = Math.max(0, primaryMatchIndex - secondary.getProximityWindow());
-        int end = Math.min(allLines.length, primaryMatchIndex + secondary.getProximityWindow() + 1);
+    private double findClosestSecondaryPatternDistance(
+            SecondaryPattern secondary, int primaryIndex, String[] allLines) {
+
+        // Use the smaller of configured max window or pattern's proximity window
+        int windowSize = Math.min(maxWindow, secondary.getProximityWindow());
+        int start = Math.max(0, primaryIndex - windowSize);
+        int end = Math.min(allLines.length, primaryIndex + windowSize + 1);
+
+        double closestDistance = -1;
 
         for (int line = start; line < end; line++) {
-            if (line == primaryMatchIndex) {
+            if (line == primaryIndex) {
                 continue; // don't match the primary line itself
             }
 
             if (secondary.getCompiledRegex().matcher(allLines[line]).find()) {
+                double distance = Math.abs(line - primaryIndex);
+
+                if (closestDistance < 0 || distance < closestDistance) {
+                    closestDistance = distance;
+                }
+
                 log.debug(
-                        "Found secondary pattern '{}' for primary match at line {}",
+                        "Found secondary pattern '{}' at line {} (distance {} from primary at line {})",
                         secondary.getRegex(),
-                        primaryMatchIndex + 1);
-                return true;
+                        line + 1,
+                        distance,
+                        primaryIndex + 1);
             }
         }
-        return false;
+
+        return closestDistance;
     }
 }
