@@ -33,6 +33,15 @@ public class ScoringService {
     @ConfigProperty(name = "scoring.proximity.max-window", defaultValue = "100")
     int maxWindow;
 
+    @ConfigProperty(name = "scoring.chronological.early-bonus-threshold", defaultValue = "0.2")
+    double earlyBonusThreshold;
+
+    @ConfigProperty(name = "scoring.chronological.max-early-bonus", defaultValue = "2.5")
+    double maxEarlyBonus;
+
+    @ConfigProperty(name = "scoring.chronological.penalty-threshold", defaultValue = "0.5")
+    double penaltyThreshold;
+
     @Inject ContextAnalysisService contextAnalysisService;
     @Inject FrequencyTrackingService frequencyTrackingService;
 
@@ -51,6 +60,9 @@ public class ScoringService {
         double severityMultiplier =
                 SEVERITY_MULTIPLIERS.getOrDefault(pattern.getSeverity().toUpperCase(), 1.0);
 
+        // calculate chronological factor (prioritize earlier errors)
+        double chronologicalFactor = calculateChronologicalFactor(event, allLines);
+
         // calculate proximity factor using exponential decay
         double proximityFactor = calculateProximityFactor(event, allLines);
 
@@ -68,10 +80,11 @@ public class ScoringService {
         frequencyTrackingService.recordPatternMatch(pattern.getId());
 
         log.debug(
-                "Pattern '{}': Base Confidence={}, Severity Multiplier={}, Proximity Factor={}, Temporal Factor={}, Context Factor={}, Frequency Penalty={}",
+                "Pattern '{}': Base Confidence={}, Severity Multiplier={}, Chronological Factor={}, Proximity Factor={}, Temporal Factor={}, Context Factor={}, Frequency Penalty={}",
                 pattern.getName(),
                 baseConfidence,
                 severityMultiplier,
+                chronologicalFactor,
                 proximityFactor,
                 temporalFactor,
                 contextFactor,
@@ -81,12 +94,52 @@ public class ScoringService {
         double finalScore =
                 baseConfidence
                         * severityMultiplier
+                        * chronologicalFactor
                         * proximityFactor
                         * temporalFactor
                         * contextFactor
                         * (1.0 - frequencyPenalty);
 
         return finalScore;
+    }
+
+    /**
+     * Calculates the chronological factor (prioritize earlier errors). Earlier errors get higher
+     * scores as they're more likely to be root causes. Uses configurable thresholds and bonus
+     * values from application.properties.
+     *
+     * @param event The primary matched event.
+     * @param allLines The complete array of log lines for context.
+     * @return The chronological factor (configurable range, higher for earlier errors).
+     */
+    private double calculateChronologicalFactor(MatchedEvent event, String[] allLines) {
+        int primaryLineIndex = event.getLineNumber() - 1;
+        double logPosition = (double) primaryLineIndex / allLines.length;
+
+        double chronologicalFactor;
+        if (logPosition <= earlyBonusThreshold) {
+            // early portion gets increasing bonus (1.5x to maxEarlyBonus)
+            double bonusRange = maxEarlyBonus - 1.5;
+            chronologicalFactor =
+                    1.5 + (earlyBonusThreshold - logPosition) * (bonusRange / earlyBonusThreshold);
+        } else if (logPosition <= penaltyThreshold) {
+            // middle portion gets mild bonus (1.0x to 1.5x)
+            double middleRange = penaltyThreshold - earlyBonusThreshold;
+            chronologicalFactor = 1.0 + (penaltyThreshold - logPosition) * (0.5 / middleRange);
+        } else {
+            // later portion gets penalized (0.5x to 1.0x)
+            chronologicalFactor = 0.5 + (1.0 - logPosition);
+        }
+
+        log.debug(
+                "Chronological factor for line {} ({}% through log): {} [thresholds: early={}%, penalty={}%]",
+                primaryLineIndex + 1,
+                Math.round(logPosition * 100),
+                chronologicalFactor,
+                Math.round(earlyBonusThreshold * 100),
+                Math.round(penaltyThreshold * 100));
+
+        return chronologicalFactor;
     }
 
     /**
