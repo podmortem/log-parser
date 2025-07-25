@@ -63,6 +63,18 @@ public class AnalysisService {
                         sp.setCompiledRegex(java.util.regex.Pattern.compile(sp.getRegex()));
                     }
                 }
+
+                // compile sequence event patterns
+                if (pattern.getSequencePatterns() != null) {
+                    for (var sequencePattern : pattern.getSequencePatterns()) {
+                        if (sequencePattern.getEvents() != null) {
+                            for (var sequenceEvent : sequencePattern.getEvents()) {
+                                sequenceEvent.setCompiledRegex(
+                                        java.util.regex.Pattern.compile(sequenceEvent.getRegex()));
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -131,7 +143,7 @@ public class AnalysisService {
                 Arrays.asList(Arrays.copyOfRange(allLines, matchIndex + 1, afterEnd));
         context.setLinesAfter(afterLines);
 
-        // TODO: Implement stack trace detection logic based on rules.getIncludeStackTrace()
+        // TODO: implement stack trace detection logic based on rules.getIncludeStackTrace()
 
         return context;
     }

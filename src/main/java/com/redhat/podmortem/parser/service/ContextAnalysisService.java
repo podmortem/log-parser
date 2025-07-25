@@ -1,25 +1,10 @@
 package com.redhat.podmortem.parser.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redhat.podmortem.common.model.analysis.EventContext;
-import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Stream;
+import java.util.regex.Pattern;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,196 +14,95 @@ public class ContextAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(ContextAnalysisService.class);
 
-    @ConfigProperty(name = "scoring.context.keywords-directory", defaultValue = "keywords")
-    String keywordsDirectory;
+    @ConfigProperty(name = "scoring.context.max-context-factor", defaultValue = "2.5")
+    double maxContextFactor;
 
-    private Map<String, Double> keywordWeights = new HashMap<>();
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @PostConstruct
-    public void loadKeywords() {
-        keywordWeights.clear();
-
-        try {
-            List<String> keywordFiles = findKeywordFiles();
-
-            if (keywordFiles.isEmpty()) {
-                log.warn("No keyword files found in directory '{}'", keywordsDirectory);
-                return;
-            }
-
-            int totalKeywords = 0;
-            for (String filename : keywordFiles) {
-                int loaded = loadKeywordFile(filename);
-                totalKeywords += loaded;
-                log.info("Loaded {} keywords from '{}'", loaded, filename);
-            }
-
-            log.info(
-                    "Total keywords loaded: {} from {} files in directory '{}'",
-                    totalKeywords,
-                    keywordFiles.size(),
-                    keywordsDirectory);
-            log.debug("All keyword weights: {}", keywordWeights);
-
-        } catch (Exception e) {
-            log.error(
-                    "Failed to load keywords from directory '{}': {}",
-                    keywordsDirectory,
-                    e.getMessage(),
-                    e);
-            // continue with empty weights rather than failing
-        }
-    }
-
-    /** Finds all JSON files in the keywords directory. */
-    private List<String> findKeywordFiles() throws IOException, URISyntaxException {
-        List<String> keywordFiles = new ArrayList<>();
-
-        // try to get the resource directory
-        ClassLoader classLoader = getClass().getClassLoader();
-        URI resourceUri =
-                classLoader.getResource(keywordsDirectory) != null
-                        ? classLoader.getResource(keywordsDirectory).toURI()
-                        : null;
-
-        if (resourceUri == null) {
-            log.warn("Keywords directory '{}' not found in classpath", keywordsDirectory);
-            return keywordFiles;
-        }
-
-        Path keywordsPath;
-        FileSystem fileSystem = null;
-
-        try {
-            if (resourceUri.getScheme().equals("jar")) {
-                fileSystem = FileSystems.newFileSystem(resourceUri, Collections.emptyMap());
-                keywordsPath = fileSystem.getPath(keywordsDirectory);
-            } else {
-                keywordsPath = Paths.get(resourceUri);
-            }
-
-            // find all .json files in the directory
-            try (Stream<Path> files = Files.list(keywordsPath)) {
-                files.filter(path -> path.toString().toLowerCase().endsWith(".json"))
-                        .forEach(
-                                path -> {
-                                    String filename =
-                                            keywordsDirectory + "/" + path.getFileName().toString();
-                                    keywordFiles.add(filename);
-                                });
-            }
-
-        } finally {
-            if (fileSystem != null) {
-                fileSystem.close();
-            }
-        }
-
-        return keywordFiles;
-    }
-
-    /** Loads keywords from a single JSON file. */
-    private int loadKeywordFile(String filename) {
-        try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(filename)) {
-            if (inputStream == null) {
-                log.warn("Keyword file '{}' not found", filename);
-                return 0;
-            }
-
-            // load the nested JSON structure
-            TypeReference<Map<String, Map<String, Double>>> typeRef = new TypeReference<>() {};
-            Map<String, Map<String, Double>> keywordCategories =
-                    objectMapper.readValue(inputStream, typeRef);
-
-            int keywordsLoaded = 0;
-            // flatten all categories into the main keyword weights map
-            for (Map.Entry<String, Map<String, Double>> categoryEntry :
-                    keywordCategories.entrySet()) {
-                String category = categoryEntry.getKey();
-                Map<String, Double> categoryKeywords = categoryEntry.getValue();
-
-                for (Map.Entry<String, Double> keywordEntry : categoryKeywords.entrySet()) {
-                    String keyword = keywordEntry.getKey();
-                    Double weight = keywordEntry.getValue();
-
-                    // check for conflicts
-                    if (keywordWeights.containsKey(keyword)) {
-                        Double existingWeight = keywordWeights.get(keyword);
-                        if (!existingWeight.equals(weight)) {
-                            log.warn(
-                                    "Keyword '{}' found in multiple files with different weights: {} and {}. Using first value: {}",
-                                    keyword,
-                                    existingWeight,
-                                    weight,
-                                    existingWeight);
-                        }
-                    } else {
-                        keywordWeights.put(keyword, weight);
-                        keywordsLoaded++;
-                    }
-                }
-
-                log.debug(
-                        "Loaded category '{}' with {} keywords from '{}'",
-                        category,
-                        categoryKeywords.size(),
-                        filename);
-            }
-
-            return keywordsLoaded;
-
-        } catch (IOException e) {
-            log.error("Failed to load keyword file '{}': {}", filename, e.getMessage(), e);
-            return 0;
-        }
-    }
+    private static final Pattern ERROR_PATTERN =
+            Pattern.compile("\\b(ERROR|FATAL|CRITICAL|SEVERE)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern WARN_PATTERN =
+            Pattern.compile("\\b(WARN|WARNING)\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern STACK_TRACE_PATTERN =
+            Pattern.compile("^\\s*at\\s+[\\w\\.\\$]+\\(.*\\)\\s*$");
+    private static final Pattern EXCEPTION_PATTERN =
+            Pattern.compile("\\b\\w*Exception\\b|\\b\\w*Error\\b");
 
     /**
-     * Calculates the context factor based on keyword weighting in the event context.
+     * Calculates the context factor
      *
      * @param context The event context containing lines before, matched line, and lines after.
-     * @return The context factor (1.0 + total keyword weights).
+     * @return The context factor (1.0 to maxContextFactor).
      */
     public double calculateContextFactor(EventContext context) {
         if (context == null) {
-            return 1.0; // no context available
+            return 1.0;
         }
 
         List<String> allLines = getAllContextLines(context);
         if (allLines.isEmpty()) {
-            return 1.0; // no lines to analyze
+            return 1.0;
         }
 
-        double totalWeight = 0.0;
-        Map<String, Integer> keywordCounts = new HashMap<>();
+        double contextScore = 0.0;
+        int errorLines = 0;
+        int warnLines = 0;
+        int stackTraceLines = 0;
+        int exceptionLines = 0;
 
         for (String line : allLines) {
-            for (Map.Entry<String, Double> entry : keywordWeights.entrySet()) {
-                String keyword = entry.getKey();
-                Double weight = entry.getValue();
+            // count severity levels
+            if (ERROR_PATTERN.matcher(line).find()) {
+                errorLines++;
+                contextScore += 0.4; // high impact for errors
+            } else if (WARN_PATTERN.matcher(line).find()) {
+                warnLines++;
+                contextScore += 0.2; // medium impact for warnings
+            }
 
-                if (line.contains(keyword)) {
-                    totalWeight += weight;
-                    keywordCounts.merge(keyword, 1, Integer::sum);
+            // detect stack traces
+            if (STACK_TRACE_PATTERN.matcher(line).find()) {
+                stackTraceLines++;
+                contextScore += 0.1; // small per-line bonus for stack traces
+            }
 
-                    log.debug(
-                            "Found keyword '{}' in line: '{}', adding weight: {}",
-                            keyword,
-                            line.trim(),
-                            weight);
-                }
+            // detect exception/error class names
+            if (EXCEPTION_PATTERN.matcher(line).find()) {
+                exceptionLines++;
+                contextScore += 0.3;
             }
         }
 
-        if (!keywordCounts.isEmpty()) {
-            log.debug(
-                    "Context analysis summary - Keywords found: {}, Total weight: {}",
-                    keywordCounts,
-                    totalWeight);
+        // apply bonuses for patterns that indicate serious issues
+        if (stackTraceLines > 0) {
+            contextScore += Math.min(stackTraceLines * 0.1, 0.5); // cap stack trace bonus
         }
 
-        return 1.0 + totalWeight;
+        // penalty for overly complex contexts (likely secondary effects)
+        int totalLines = allLines.size();
+        if (totalLines > 10 && (stackTraceLines + errorLines) > totalLines * 0.7) {
+            contextScore *= 0.8; // reduce score for very dense error contexts
+            log.debug(
+                    "Applied density penalty for complex context: {} lines, {}% error content",
+                    totalLines,
+                    Math.round(((double) (stackTraceLines + errorLines) / totalLines) * 100));
+        }
+
+        double contextFactor = 1.0 + contextScore;
+
+        // cap the context factor to prevent overwhelming
+        if (contextFactor > maxContextFactor) {
+            contextFactor = maxContextFactor;
+            log.debug("Context factor capped at {}", maxContextFactor);
+        }
+
+        log.debug(
+                "Context analysis: {} errors, {} warnings, {} stack traces, {} exceptions, factor={}",
+                errorLines,
+                warnLines,
+                stackTraceLines,
+                exceptionLines,
+                contextFactor);
+
+        return contextFactor;
     }
 
     /**
@@ -246,22 +130,5 @@ public class ContextAnalysisService {
         }
 
         return allLines;
-    }
-
-    /**
-     * Returns the current keyword weights for debugging/inspection purposes.
-     *
-     * @return A copy of the current keyword weights map.
-     */
-    public Map<String, Double> getKeywordWeights() {
-        return new HashMap<>(keywordWeights);
-    }
-
-    /**
-     * Reloads all keywords from the keywords directory. Useful for runtime updates without restart.
-     */
-    public void reloadKeywords() {
-        log.info("Reloading keywords from directory '{}'", keywordsDirectory);
-        loadKeywords();
     }
 }
