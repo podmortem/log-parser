@@ -1,6 +1,6 @@
    categories:
      - title: Features
-       labels: [feat, enhancement]
+       labels: [feature, enhancement]
      - title: Fixes
        labels: [bug, fix, patch]
      - title: Other
