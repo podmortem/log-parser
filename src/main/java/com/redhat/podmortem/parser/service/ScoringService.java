@@ -13,6 +13,14 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Service for calculating confidence scores for matched failure patterns.
+ *
+ * <p>Implements a scoring algorithm that considers multiple factors including severity levels,
+ * chronological position, proximity to secondary patterns, temporal sequence analysis, contextual
+ * keywords, and frequency penalties. Scores help prioritize the most relevant failure events for AI
+ * analysis.
+ */
 @ApplicationScoped
 public class ScoringService {
 
@@ -253,7 +261,14 @@ public class ScoringService {
         return true;
     }
 
-    /** Checks if a sequence event is found near the primary match. */
+    /**
+     * Checks if a sequence event is found near the primary match.
+     *
+     * @param sequenceEvent the sequence event to search for
+     * @param primaryIndex the line index of the primary pattern match
+     * @param allLines the complete array of log lines
+     * @return true if the event is found within the search window, false otherwise
+     */
     private boolean isEventFoundNearPrimary(
             SequenceEvent sequenceEvent, int primaryIndex, String[] allLines) {
         // check a small window around the primary match (+/- 5 lines)
@@ -270,7 +285,14 @@ public class ScoringService {
         return false;
     }
 
-    /** Finds a sequence event before the given index. */
+    /**
+     * Finds a sequence event before the given index.
+     *
+     * @param sequenceEvent the sequence event to search for
+     * @param beforeIndex the line index to search before
+     * @param allLines the complete array of log lines
+     * @return the line index where the event was found, or -1 if not found
+     */
     private int findEventBefore(SequenceEvent sequenceEvent, int beforeIndex, String[] allLines) {
         // search backwards from the given index
         for (int i = beforeIndex - 1; i >= 0; i--) {
@@ -293,7 +315,7 @@ public class ScoringService {
     private double findClosestSecondaryPatternDistance(
             SecondaryPattern secondary, int primaryIndex, String[] allLines) {
 
-        // Use the smaller of configured max window or pattern's proximity window
+        // use the smaller of configured max window or pattern's proximity window
         int windowSize = Math.min(maxWindow, secondary.getProximityWindow());
         int start = Math.max(0, primaryIndex - windowSize);
         int end = Math.min(allLines.length, primaryIndex + windowSize + 1);

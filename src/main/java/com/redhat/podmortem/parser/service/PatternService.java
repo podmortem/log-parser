@@ -18,6 +18,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Service for loading and managing failure pattern definitions from YAML files.
+ *
+ * <p>Discovers and parses all YAML pattern files from a configured directory at startup. Pattern
+ * files define failure scenarios, regex patterns, severity levels, and remediation information used
+ * by the analysis service to identify pod failure causes.
+ */
 @ApplicationScoped
 public class PatternService {
 
@@ -28,6 +35,13 @@ public class PatternService {
     @ConfigProperty(name = "pattern.directory")
     String patternDirectoryPath;
 
+    /**
+     * Loads pattern definitions from YAML files during application startup.
+     *
+     * <p>Recursively scans the configured pattern directory for .yml and .yaml files, parsing each
+     * one into PatternSet objects. Invalid files are logged and skipped. This method is called
+     * automatically after dependency injection.
+     */
     @PostConstruct
     void loadPatterns() {
         log.info("Loading patterns from directory: {}", patternDirectoryPath);

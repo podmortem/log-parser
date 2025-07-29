@@ -13,6 +13,13 @@ import jakarta.ws.rs.core.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * REST API controller for pod failure log parsing and analysis.
+ *
+ * <p>Provides endpoints for processing pod failure data and extracting meaningful patterns from
+ * container logs. Orchestrates the complete log analysis pipeline from raw log data to structured
+ * analysis results.
+ */
 @Path("/parse")
 public class Parse {
 
@@ -20,6 +27,17 @@ public class Parse {
 
     @Inject AnalysisService analysisService;
 
+    /**
+     * Parses and analyzes pod failure logs to identify failure patterns.
+     *
+     * <p>Takes complete pod failure data including pod specification, logs, and events, then
+     * applies pattern matching algorithms to identify the root cause and severity of the failure.
+     * Returns structured analysis results with matched patterns, confidence scores, and contextual
+     * information.
+     *
+     * @param data the complete pod failure data containing logs and metadata
+     * @return an HTTP response with structured analysis results or error information
+     */
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)

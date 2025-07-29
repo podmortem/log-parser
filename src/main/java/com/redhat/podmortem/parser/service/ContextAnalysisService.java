@@ -9,6 +9,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Service for analyzing the contextual information surrounding matched failure patterns.
+ *
+ * <p>Evaluates the lines before and after a pattern match to determine the severity and relevance
+ * of the context. Uses regex patterns to identify error levels, stack traces, exceptions, and other
+ * contextual indicators that affect the confidence score of a matched event.
+ */
 @ApplicationScoped
 public class ContextAnalysisService {
 
@@ -27,7 +34,11 @@ public class ContextAnalysisService {
             Pattern.compile("\\b\\w*Exception\\b|\\b\\w*Error\\b");
 
     /**
-     * Calculates the context factor
+     * Calculates the context factor based on surrounding log lines.
+     *
+     * <p>Analyzes the context around a matched event to determine how much the surrounding lines
+     * should boost the confidence score. Considers error levels, stack traces, exceptions, and
+     * applies penalties for overly dense error contexts.
      *
      * @param context The event context containing lines before, matched line, and lines after.
      * @return The context factor (1.0 to maxContextFactor).

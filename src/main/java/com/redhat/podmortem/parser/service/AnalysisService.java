@@ -25,6 +25,13 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Core service for analyzing pod failure logs and identifying failure patterns.
+ *
+ * <p>Orchestrates the complete log analysis pipeline including pattern matching, regex compilation,
+ * context extraction, scoring calculation, and result summarization. Uses loaded pattern sets to
+ * identify known failure scenarios and calculate confidence scores for matched events.
+ */
 @ApplicationScoped
 public class AnalysisService {
 

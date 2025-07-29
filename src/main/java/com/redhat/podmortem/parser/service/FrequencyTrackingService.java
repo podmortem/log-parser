@@ -9,6 +9,14 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Service for tracking pattern match frequencies and applying frequency-based scoring penalties.
+ *
+ * <p>Maintains sliding time windows of pattern matches to identify frequently occurring patterns
+ * that may be noise rather than genuine failure indicators. Applies penalties to reduce scores for
+ * patterns that occur too frequently, helping prioritize unique or rare failure events that are
+ * more likely to indicate root causes.
+ */
 @ApplicationScoped
 public class FrequencyTrackingService {
 
