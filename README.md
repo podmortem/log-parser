@@ -1,6 +1,7 @@
 # log-parser
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=podmortem_log-parser&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=podmortem_log-parser)
 
-A Quarkus-based service for analyzing logs and identifying failure patterns.
+> A Quarkus-based service for analyzing logs and identifying failure patterns.
 
 ## Overview
 
