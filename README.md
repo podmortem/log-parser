@@ -47,4 +47,4 @@ Key configuration properties:
 For native compilation:
 ```bash
 ./mvnw package -Dnative
-``` 
+```

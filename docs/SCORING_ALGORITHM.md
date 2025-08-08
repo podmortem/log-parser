@@ -7,12 +7,12 @@ The log-parser uses a sophisticated multi-factor scoring algorithm to calculate 
 ## Overall Scoring Formula
 
 ```
-Final Score = Base Confidence 
-            × Severity Multiplier 
-            × Chronological Factor 
-            × Proximity Factor 
-            × Temporal Factor 
-            × Context Factor 
+Final Score = Base Confidence
+            × Severity Multiplier
+            × Chronological Factor
+            × Proximity Factor
+            × Temporal Factor
+            × Context Factor
             × (1.0 - Frequency Penalty)
 ```
 
@@ -20,8 +20,8 @@ Final Score = Base Confidence
 
 ### 1. Base Confidence
 
-**Source**: Pattern definition in YAML files  
-**Range**: 0.0 to 1.0  
+**Source**: Pattern definition in YAML files
+**Range**: 0.0 to 1.0
 **Purpose**: Pattern-specific confidence level defined by pattern authors
 
 This is the starting confidence score defined in the pattern YAML file:
@@ -34,8 +34,8 @@ primary_pattern:
 
 ### 2. Severity Multiplier
 
-**Source**: Pattern definition in YAML files (severity field)  
-**Range**: 1.0 to 5.0  
+**Source**: Pattern definition in YAML files (severity field)
+**Range**: 1.0 to 5.0
 **Purpose**: Amplify scores for more severe failure types
 
 | Severity | Multiplier |
@@ -48,8 +48,8 @@ primary_pattern:
 
 ### 3. Chronological Factor
 
-**Source**: Calculated from log line position  
-**Range**: 0.5 to configurable max (default: 2.5)  
+**Source**: Calculated from log line position
+**Range**: 0.5 to configurable max (default: 2.5)
 **Purpose**: Prioritize earlier errors as they're more likely to be root causes
 
 The algorithm divides the log into three zones based on configurable thresholds:
@@ -83,8 +83,8 @@ factor = 0.5 + (1.0 - position)
 
 ### 4. Proximity Factor
 
-**Source**: Secondary patterns defined in YAML files + line distance calculation  
-**Range**: 1.0 to unlimited (practical max ~3.0)  
+**Source**: Secondary patterns defined in YAML files + line distance calculation
+**Range**: 1.0 to unlimited (practical max ~3.0)
 **Purpose**: Boost scores when secondary patterns are found nearby
 
 Uses exponential decay to calculate proximity bonus:
@@ -115,8 +115,8 @@ proximity_factor = 1.0 + 0.485 = 1.485
 
 ### 5. Temporal Factor
 
-**Source**: Sequence patterns defined in YAML files + chronological event matching  
-**Range**: 1.0 to unlimited  
+**Source**: Sequence patterns defined in YAML files + chronological event matching
+**Range**: 1.0 to unlimited
 **Purpose**: Bonus for matching event sequences that indicate cascading failures
 
 ```
@@ -130,17 +130,17 @@ Where sequence matching:
 
 ### 6. Context Factor
 
-**Source**: Surrounding log lines analysis using regex patterns  
-**Range**: 1.0 to configurable max (default: 2.5)  
+**Source**: Surrounding log lines analysis using regex patterns
+**Range**: 1.0 to configurable max (default: 2.5)
 **Purpose**: Boost scores based on error-rich surrounding context
 
 The context analysis examines lines before, at, and after the match:
 
 ```
-context_score = 0.4 × error_lines 
-              + 0.2 × warning_lines 
-              + 0.1 × stack_trace_lines 
-              + 0.3 × exception_lines 
+context_score = 0.4 × error_lines
+              + 0.2 × warning_lines
+              + 0.1 × stack_trace_lines
+              + 0.3 × exception_lines
               + min(stack_trace_lines × 0.1, 0.5)
 ```
 
@@ -159,8 +159,8 @@ context_factor = min(1.0 + context_score, max_context_factor)
 
 ### 7. Frequency Penalty
 
-**Source**: Pattern match frequency tracking over time window  
-**Range**: 0.0 to configurable max (default: 0.8)  
+**Source**: Pattern match frequency tracking over time window
+**Range**: 0.0 to configurable max (default: 0.8)
 **Purpose**: Reduce scores for frequently occurring patterns (noise reduction)
 
 ```
@@ -240,4 +240,4 @@ Final Score = 0.8 × 3.0 × 2.1 × 1.4 × 1.0 × 1.5 × (1.0 - 0.0)
 ### Sequence Pattern Design
 - Define cascading failure sequences (connection → timeout → retry → failure)
 - Use moderate bonus multipliers (0.2-0.5) to avoid overwhelming primary scores
-- Consider temporal relationships in container startup sequences 
+- Consider temporal relationships in container startup sequences
